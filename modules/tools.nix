@@ -54,6 +54,8 @@
             zle -N zle-line-init
             zle -N zle-keymap-select
 
+            function preexec { print -n '\e[2 q' }
+
             function vi-yank-pbcopy { zle vi-yank; echo "$CUTBUFFER" | pbcopy }
             zle -N vi-yank-pbcopy
             bindkey -M vicmd 'y' vi-yank-pbcopy

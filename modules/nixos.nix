@@ -21,10 +21,4 @@
         }
       ];
   };
-
-  flake.nixosConfigurations.nix = lib.nixosSystem {
-    modules = with self.modules.nixos; [
-      init
-    ];
-  };
 }
