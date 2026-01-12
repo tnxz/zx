@@ -84,8 +84,6 @@
             bindkey -M viins "^U" kill-whole-line
             bindkey -M viins "^P" history-search-backward
             bindkey -M viins "^N" history-search-forward
-
-            prompt="%n@%m %1~ %# "
           '';
       };
       bash = {
