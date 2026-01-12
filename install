@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+command -v orb >/dev/null 2>&1 || exit 1
+
+orb info zx >/dev/null 2>&1 || orb create -u z nixos:unstable zx
+
+orb -m zx -u root bash -c "
+mkdir -p ~/.ssh && touch ~/.ssh/known_hosts
+ssh-keygen -F github.com || ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+ssh-add /home/z/.ssh/id_ed25519
+
+NIX_CONFIG='extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=
+extra-substituters = https://nix-community.cachix.org
+experimental-features = nix-command flakes' nix-shell -p git --run '
+git clone git@github.com:tnxz/zx /home/z/zrc/zx
+nixos-rebuild switch --flake /home/z/zrc/zx#zx --impure'
+
+chown -R z:users /home/z/zrc
+"
