@@ -40,7 +40,6 @@
         nui-nvim
         noice-nvim
         flash-nvim
-        tabout-nvim
         mini-pairs
         mini-surround
         mini-ai
@@ -68,6 +67,26 @@
           vim.keymap.set("n", "<down>", "<nop>")
           vim.keymap.set("n", "<tab>", "<C-w><C-w>")
           vim.keymap.set("n", "<space><space>", "<cmd>write<cr>")
+          vim.keymap.set("i", "<Tab>", function()
+            local col = vim.fn.col(".")
+            local line = vim.fn.getline(".")
+            local char = line:sub(col, col)
+            if char:match("[%(%)%{%}%[%]<>\"']") then
+              return "<Right>"
+            else
+              return "<Tab>"
+            end
+          end, { expr = true, silent = true })
+          vim.keymap.set("i", "<S-Tab>", function()
+            local col = vim.fn.col(".")
+            local line = vim.fn.getline(".")
+            local char = line:sub(col - 1, col - 1)
+            if char:match("[%(%)%{%}%[%]<>\"']") then
+              return "<Left>"
+            else
+              return "<S-Tab>"
+            end
+          end, { expr = true, silent = true })
 
           vim.cmd([[
             set nosmd noswf nowb ph=10 scl=yes noru ch=0 fcs=eob:\  sw=2 scs spr sb nu nowrap udf
@@ -304,13 +323,6 @@
                   },
                 },
                 opts = { modes = { char = { keys = {} } } },
-              },
-
-              {
-                dir = "${pkgs.vimPlugins.tabout-nvim}",
-                "abecodes/tabout.nvim",
-                event = "InsertEnter",
-                opts = {},
               },
 
               {
