@@ -60,13 +60,13 @@
         # lua
         ''
           vim.keymap.set({ "i", "n", "s" }, "<esc>", "<cmd>noh<CR><esc>")
-          vim.keymap.set("n", "<space>r", "<cmd>restart<cr>")
+          vim.keymap.set("n", "<space>R", "<cmd>restart<cr>")
           vim.keymap.set("n", "<left>", "<nop>")
           vim.keymap.set("n", "<right>", "<nop>")
           vim.keymap.set("n", "<up>", "<nop>")
           vim.keymap.set("n", "<down>", "<nop>")
           vim.keymap.set("n", "<tab>", "<C-w><C-w>")
-          vim.keymap.set("n", "<space><space>", "<cmd>write<cr>")
+          vim.keymap.set("n", "<space><space>", "<cmd>update<cr>")
           vim.keymap.set("i", "<Tab>", function()
             local col = vim.fn.col(".")
             local line = vim.fn.getline(".")
@@ -121,21 +121,6 @@
               if event.match:match("^%w%w+:[\\/][\\/]") then return end
               local file = vim.uv.fs_realpath(event.match) or event.match
               vim.fn.mkdir(vim.fn.fnamemodify(file, ":p:h"), "p")
-            end,
-          })
-
-          vim.api.nvim_create_autocmd("BufEnter", {
-            group = vim.api.nvim_create_augroup("setup_project_root", { clear = true }),
-            callback = function(ev)
-              if vim.bo[ev.buf].buftype ~= "" then return end
-              local name = vim.api.nvim_buf_get_name(ev.buf)
-              if name == "" or not vim.uv.fs_stat(name) then return end
-              local path = vim.fn.resolve(name)
-              if path == "" or path:match("/scratch/") then return end
-              local root_file =
-                vim.fs.find({ ".git", "Cargo.toml", "go.mod", ".venv", "flake.nix" }, { upward = true, path = path })[1]
-              local root = root_file and vim.fs.dirname(root_file) or vim.fs.dirname(path)
-              if root ~= vim.uv.cwd() then vim.fn.chdir(root) end
             end,
           })
 
@@ -312,7 +297,7 @@
                 event = "VeryLazy",
                 keys = {
                   {
-                    "<space>,",
+                    "<space>n",
                     mode = { "n", "x", "o" },
                     function() require("flash").jump() end,
                   },
@@ -338,11 +323,11 @@
                 event = "VeryLazy",
                 opts = {
                   mappings = {
+                    find_left = "zF",
+                    highlight = "zh",
                     add = "za",
                     delete = "zd",
                     find = "zf",
-                    find_left = "zF",
-                    highlight = "zh",
                     replace = "zr",
                   },
                 },
@@ -521,6 +506,7 @@
                   picker = {
                     prompt = "",
                     sources = {
+                      files = { hidden = true },
                       grep = { hidden = true },
                       explorer = { hidden = true, win = { list = { keys = { ["o"] = "explorer_add" } } } },
                       projects = {
@@ -528,9 +514,93 @@
                         patterns = { "flake.nix", ".git", "_darcs", ".hg", ".bzr", ".svn", "package.json", "Makefile" },
                         recent = false,
                         win = {
-                          input = { keys = { ["<c-x>"] = { "explorer_del", mode = { "i", "n" } } } },
-                          list = { keys = { ["dd"] = "explorer_del" } },
+                          input = {
+                            keys = {
+                              ["<CR>"] = { { "cd", "picker_files" }, mode = { "n", "i" } },
+                              ["<c-x>"] = { "project_remove", mode = { "i", "n" } },
+                              ["<c-n>"] = { "project_init", mode = { "i", "n" } },
+                            },
+                          },
+                          list = {
+                            keys = {
+                              ["<CR>"] = { "cd", "picker_files" },
+                              ["dd"] = "project_remove",
+                              ["<n>"] = "project_init",
+                            },
+                          },
                         },
+                        actions = {
+                          project_remove = function(picker, item)
+                            if not item or not item.file then return end
+                            local path = item.file
+                            if picker._project_removing then return end
+                            picker._project_removing = true
+                            local cwd = vim.uv.cwd()
+                            if cwd and cwd:match("^" .. vim.pesc(path)) then vim.cmd("cd ~/src/") end
+                            local ok, err = require("snacks.explorer.actions").trash(path)
+                            if ok then
+                              if cwd == path then Snacks.bufdelete.all({ force = true }) end
+                              picker:refresh()
+                              vim.notify("Project deleted: " .. path)
+                            else
+                              vim.notify("Failed to delete project:\n" .. err, vim.log.levels.ERROR)
+                            end
+                            picker._project_removing = false
+                          end,
+                          project_init = function(picker)
+                            picker:close()
+                            Snacks.picker.project_init()
+                          end,
+                        },
+                      },
+                      project_init = {
+                        languages = {
+                          _ = "",
+                          c = "mkdir src && touch src/main.c",
+                          cpp = "mkdir src && touch src/main.cpp",
+                          go = "touch main.go && go mod init github.com/tnxz/",
+                          java = "mkdir src && touch src/main.java",
+                          python = "uv init",
+                          rust = "cargo init",
+                          zig = "zig init",
+                        },
+                        finder = function(opts)
+                          local ret = {}
+                          for key, _ in pairs(opts.languages) do
+                            table.insert(ret, { text = key })
+                          end
+                          return ret
+                        end,
+                        format = "text",
+                        layout = "dropdown",
+                        confirm = function(picker, item)
+                          picker:close()
+                          if not item then return end
+                          local ok, name = pcall(vim.fn.input, "New Project Name: ")
+                          if not ok or vim.trim(name) == "" then
+                            vim.notify("Empty Project Name", vim.log.levels.WARN)
+                            return
+                          end
+                          local cwd = vim.fn.expand("~/src/" .. name)
+                          vim.fn.mkdir(cwd, "p")
+                          local cmd = picker.opts.languages[item.text]
+                          if item.text == "go" then cmd = cmd .. name end
+                          local function find_main_file(dir)
+                            local files = vim.fn.glob(dir .. "/**/main.*", false, true, true)
+                            if #files > 0 then return files[1] end
+                            return nil
+                          end
+                          Snacks.picker.util.cmd("git init && " .. cmd, function(_, code)
+                            if code == 0 then
+                              vim.notify("project created successfully", vim.log.levels.INFO)
+                              vim.fn.chdir(cwd)
+                              local main = find_main_file(cwd)
+                              if main then vim.cmd("edit " .. main) end
+                            else
+                              vim.notify("Error creating project", vim.log.levels.ERROR)
+                            end
+                          end, { cwd = cwd })
+                        end,
                       },
                       zoxide = {
                         win = {
@@ -714,23 +784,6 @@
                     })
                   end
                   Snacks.setup(opts)
-                  vim.api.nvim_create_autocmd({ "BufEnter", "TextChanged", "TextChangedI" }, {
-                    group = vim.api.nvim_create_augroup("misc", { clear = true }),
-                    callback = function(ev)
-                      local ft = vim.bo[ev.buf].filetype
-                      if vim.tbl_contains({ "man", "help", "lazy" }, ft) then
-                        vim.cmd.setlocal("scl=no stc= nonu nornu")
-                        return
-                      end
-                      if vim.bo[ev.buf].buftype ~= "" then return end
-                      local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-                      if #lines == 1 and lines[1] == "" then
-                        vim.cmd.setlocal("scl=no stc= nonu nornu")
-                      else
-                        vim.cmd.setlocal("scl=yes stc=%!v:lua.require'snacks.statuscolumn'.get() nu rnu")
-                      end
-                    end,
-                  })
                 end,
               },
 
@@ -738,12 +791,7 @@
                 dir = "${code_runner}",
                 "CRAG666/code_runner.nvim",
                 cmd = { "RunCode", "RunFile", "RunProject", "RunClose", "CRFiletype", "CRProjects" },
-                keys = {
-                  {
-                    "<space>cr",
-                    function() require("code_runner").run_code() end,
-                  },
-                },
+                keys = { { "<space>r", function() require("code_runner").run_code() end } },
                 config = function()
                   local function run(args)
                     return function()
