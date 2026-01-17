@@ -1,6 +1,6 @@
 {
   "nodes": {
-    "code_runner-nvim": {
+    "code_runner": {
       "flake": false,
       "locked": {
         "lastModified": 1760846553,
@@ -148,7 +148,7 @@
     },
     "root": {
       "inputs": {
-        "code_runner-nvim": "code_runner-nvim",
+        "code_runner": "code_runner",
         "flake-parts": "flake-parts",
         "home-manager": "home-manager",
         "import-tree": "import-tree",

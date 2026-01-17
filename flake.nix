@@ -14,7 +14,7 @@
       url = "github:nix-community/neovim-nightly-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    code_runner-nvim = {
+    code_runner = {
       url = "github:CRAG666/code_runner.nvim";
       flake = false;
     };

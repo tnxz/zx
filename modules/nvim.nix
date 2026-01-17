@@ -15,7 +15,7 @@
         version = "unstable";
         inherit src;
       };
-    code_runner-nvim = mkVimPlugin "code_runner.nvim" inputs.code_runner-nvim;
+    code_runner = mkVimPlugin "code_runner.nvim" inputs.code_runner;
     ts-root = pkgs.vimPlugins.nvim-treesitter.withAllGrammars;
     ts-parsers = pkgs.symlinkJoin {
       name = "ts-parsers";
@@ -51,7 +51,7 @@
         oil-nvim
         flatten-nvim
         snacks-nvim
-        code_runner-nvim
+        code_runner
         nvim-lspconfig
         conform-nvim
         friendly-snippets
@@ -722,7 +722,7 @@
               },
 
               {
-                dir = "${code_runner-nvim}",
+                dir = "${code_runner}",
                 "CRAG666/code_runner.nvim",
                 cmd = { "RunCode", "RunFile", "RunProject", "RunClose", "CRFiletype", "CRProjects" },
                 keys = {
