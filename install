@@ -15,8 +15,8 @@ ssh-add /home/z/.ssh/id_ed25519
 NIX_CONFIG='extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=
 extra-substituters = https://nix-community.cachix.org
 experimental-features = nix-command flakes' nix-shell -p git --run '
-git clone git@github.com:tnxz/zx /home/z/zrc/zx
-nixos-rebuild switch --flake /home/z/zrc/zx#zx --impure'
+[ ! -d /home/z/src/zx ] && git clone git@github.com:tnxz/zx /home/z/src/zx
+nixos-rebuild switch --flake /home/z/src/zx#zx --impure'
 
-chown -R z:users /home/z/zrc
+chown -R z:users /home/z/src
 "

@@ -483,6 +483,7 @@
 
                   { "<space>f", function() Snacks.picker.files() end },
                   { "ff", function() Snacks.picker.files({ cwd = Snacks.git.get_root() }) end },
+                  { "<space>c", function() Snacks.picker.files({ cwd = "~/src/zx" }) end },
 
                   { "<space>v", function() Snacks.picker.projects() end },
                   { "<space>E", function() Snacks.picker.project_init() end },
@@ -523,7 +524,7 @@
                       grep = { hidden = true },
                       explorer = { hidden = true, win = { list = { keys = { ["o"] = "explorer_add" } } } },
                       projects = {
-                        dev = "~/zrc",
+                        dev = "~/src",
                         patterns = { "flake.nix", ".git", "_darcs", ".hg", ".bzr", ".svn", "package.json", "Makefile" },
                         recent = false,
                         win = {

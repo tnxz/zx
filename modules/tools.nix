@@ -3,7 +3,7 @@
     environment.systemPackages = with pkgs; [tree];
 
     environment.shellAliases = {
-      nix-switch = "nixos-rebuild switch --flake /home/z/zrc/zx#zx --impure --sudo";
+      nix-switch = "nixos-rebuild switch --flake /home/z/src/zx#zx --impure --sudo";
       c = "clear";
       t = "tree -al -I '.venv|.git'";
       l = "ls -AS";
