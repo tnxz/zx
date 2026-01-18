@@ -452,6 +452,7 @@
                   { "<space>?", function() Snacks.picker.grep_buffers() end },
 
                   { "<space>e", function() Snacks.picker.explorer({ cwd = Snacks.git.get_root() }) end },
+                  { "-", function() Snacks.picker.explorer({ cwd = Snacks.git.get_root() }) end },
 
                   { "<space>x", function() Snacks.picker.diagnostics_buffer() end },
                   { "<space>X", function() Snacks.picker.diagnostics({ filter = { cwd = Snacks.git.get_root() } }) end },
@@ -489,7 +490,7 @@
                   quickfile = { enabled = true },
                   statuscolumn = { enabled = true },
                   input = { icon = "", prompt_pos = "left", win = { border = "none", width = vim.o.co, row = 0, col = 0 } },
-                  explorer = { replace_netrw = true, trash = true },
+                  explorer = { replace_netrw = true },
                   terminal = { win = { wo = { winbar = "" } } },
                   lazygit = { win = { keys = { term_normal = { "<esc>" } } } },
                   scratch = { win = { position = "top" } },
