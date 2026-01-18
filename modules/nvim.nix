@@ -47,6 +47,7 @@
         mini-move
         mini-git
         gitsigns-nvim
+        persistence-nvim
         flatten-nvim
         snacks-nvim
         code_runner
@@ -425,8 +426,16 @@
               },
 
               {
+                dir = "${pkgs.vimPlugins.persistence-nvim}",
+                "folke/persistence.nvim",
+                event = "BufReadPre",
+                opts = {},
+              },
+
+              {
                 dir = "${pkgs.vimPlugins.snacks-nvim}",
                 "folke/snacks.nvim",
+                dependencies = { "persistence.nvim" },
                 priority = 2000,
                 lazy = false,
                 keys = {
