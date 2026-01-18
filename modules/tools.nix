@@ -84,53 +84,12 @@
             bindkey -M viins "^U" kill-whole-line
             bindkey -M viins "^P" history-search-backward
             bindkey -M viins "^N" history-search-forward
+
+            if (( $+commands[orbctl] )); then
+              eval "$(orbctl completion zsh)"
+              compdef _orbctl orb
+            fi
           '';
-      };
-      bash = {
-        enable = true;
-        initExtra =
-          # bash
-          ''
-            function print_osc7() {
-              printf "\033]7;file://$PWD\033\\"
-            }
-            PROMPT_COMMAND='print_osc7'
-          '';
-      };
-      nushell = {
-        enable = true;
-        settings = {
-          edit_mode = "vi";
-          cursor_shape = {
-            emacs = "line";
-            vi_insert = "line";
-            vi_normal = "block";
-          };
-        };
-      };
-      readline = {
-        enable = true;
-        variables = {
-          keyseq-timeout = 0;
-          editing-mode = "vi";
-          show-mode-in-prompt = "on";
-          vi-cmd-mode-string = ''"\1\e[2 q\2"'';
-          vi-ins-mode-string = ''"\1\e[6 q\2"'';
-        };
-        bindings = {
-          "\\C-a" = "beginning-of-line";
-          "\\C-b" = "backward-char";
-          "\\C-e" = "end-of-line";
-          "\\C-f" = "forward-char";
-          "\\C-j" = "next-history";
-          "\\C-k" = "previous-history";
-          "\\C-l" = "clear-screen";
-          "\\C-r" = "reverse-search-history";
-          "\\C-s" = "forward-search-history";
-          "\\C-u" = "unix-line-discard";
-          "\\C-w" = "backward-kill-word";
-          "\\C-y" = "copy-region-as-kill";
-        };
       };
       direnv = {
         enable = true;
