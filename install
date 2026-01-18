@@ -11,7 +11,7 @@ defaults write -g InitialKeyRepeat -int 10
 defaults write -g KeyRepeat -int 1
 defaults write com.apple.dock persistent-apps -array
 
-mkdir -p $HOME/Library/Application\ Support/com.mitchellh.ghostty/config
+mkdir -p $HOME/Library/Application\ Support/com.mitchellh.ghostty
 cat <<EOF > /Users/z/Library/Application\ Support/com.mitchellh.ghostty/config
 font-family                   = Iosevka SS03
 font-size                     = 20
