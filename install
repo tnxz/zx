@@ -45,8 +45,11 @@ palette                       = 15=#c0caf5
 background                    = #000000
 foreground                    = #c0caf5
 cursor-color                  = #c0caf5
+cursor-text                   = #000000
+selection-background          = #283457
+selection-foreground          = cell-foreground
 term                          = xterm-256color
-command                       = /Applications/OrbStack.app/Contents/MacOS/bin/orb -w /home/z
+command                       = /Applications/OrbStack.app/Contents/MacOS/bin/orb -w /home/z/src
 EOF
 
 touch $HOME/.hushlogin
