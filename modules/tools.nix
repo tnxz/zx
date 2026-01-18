@@ -42,6 +42,7 @@
 
             zstyle ':completion:*' menu select
             zmodload zsh/complist
+            _comp_options+=(globdots)
             bindkey -M menuselect "\e" send-break
 
             bindkey -v
