@@ -45,7 +45,6 @@
             _comp_options+=(globdots)
             bindkey -M menuselect "\e" send-break
 
-            bindkey -v
             export KEYTIMEOUT=1
 
             function zle-keymap-select zle-line-init {
