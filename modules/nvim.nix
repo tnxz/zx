@@ -797,6 +797,7 @@
                     return function()
                       local cwd = vim.uv.cwd()
                       local root_file = cwd .. "/" .. args.root_marker
+                      vim.cmd.update()
                       if vim.fn.filereadable(root_file) == 1 then
                         require("code_runner.commands").run_from_fn(args.project_cmd)
                       else
