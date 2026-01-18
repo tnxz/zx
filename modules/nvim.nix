@@ -47,7 +47,6 @@
         mini-move
         mini-git
         gitsigns-nvim
-        oil-nvim
         flatten-nvim
         snacks-nvim
         code_runner
@@ -411,24 +410,6 @@
                   },
                 },
                 opts = {},
-              },
-
-              {
-                dir = "${pkgs.vimPlugins.oil-nvim}",
-                "stevearc/oil.nvim",
-                event = { "VimEnter */*,.*", "BufNew */*,.*" },
-                cmd = "Oil",
-                keys = { { "-", "<cmd>Oil<cr>" }, { "_", "<cmd>Oil .<cr>" } },
-                opts = {
-                  keymaps = { ["`"] = false, ["q"] = { "actions.close", mode = "n" } },
-                  view_options = { show_hidden = true },
-                  delete_to_trash = true,
-                  float = { border = "single" },
-                  confirmation = { border = "single" },
-                  progress = { border = "single" },
-                  ssh = { border = "single" },
-                  keymaps_help = { border = "single" },
-                },
               },
 
               {
