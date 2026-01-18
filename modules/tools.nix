@@ -91,6 +91,10 @@
               eval "$(orbctl completion zsh)"
               compdef _orbctl orb
             fi
+
+            if (( $+commands[macctl] )); then
+              eval "$(macctl completion zsh)"
+            fi
           '';
       };
       direnv = {
