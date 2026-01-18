@@ -41,6 +41,8 @@
             print_osc7
 
             zstyle ':completion:*' menu select
+            zmodload zsh/complist
+            bindkey -M menuselect "\e" send-break
 
             bindkey -v
             export KEYTIMEOUT=1
