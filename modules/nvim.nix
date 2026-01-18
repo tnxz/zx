@@ -462,7 +462,6 @@
                   { "<space>c", function() Snacks.picker.files({ cwd = "~/src/zx" }) end },
 
                   { "<space>v", function() Snacks.picker.projects() end },
-                  { "<space>E", function() Snacks.picker.project_init() end },
                   { "<space>C", function() Snacks.picker.zoxide() end },
 
                   {
@@ -504,118 +503,6 @@
                         dev = "~/src",
                         patterns = { "flake.nix", ".git", "_darcs", ".hg", ".bzr", ".svn", "package.json", "Makefile" },
                         recent = false,
-                        win = {
-                          input = {
-                            keys = {
-                              ["<CR>"] = { { "cd", "picker_files" }, mode = { "n", "i" } },
-                              ["<c-x>"] = { "project_remove", mode = { "i", "n" } },
-                              ["<c-n>"] = { "project_init", mode = { "i", "n" } },
-                            },
-                          },
-                          list = {
-                            keys = {
-                              ["<CR>"] = { "cd", "picker_files" },
-                              ["dd"] = "project_remove",
-                              ["<n>"] = "project_init",
-                            },
-                          },
-                        },
-                        actions = {
-                          project_remove = function(picker, item)
-                            if not item or not item.file then return end
-                            local path = item.file
-                            if picker._project_removing then return end
-                            picker._project_removing = true
-                            local cwd = vim.uv.cwd()
-                            if cwd and cwd:match("^" .. vim.pesc(path)) then vim.cmd("cd ~/src/") end
-                            local ok, err = require("snacks.explorer.actions").trash(path)
-                            if ok then
-                              if cwd == path then Snacks.bufdelete.all({ force = true }) end
-                              picker:refresh()
-                              vim.notify("Project deleted: " .. path)
-                            else
-                              vim.notify("Failed to delete project:\n" .. err, vim.log.levels.ERROR)
-                            end
-                            picker._project_removing = false
-                          end,
-                          project_init = function(picker)
-                            picker:close()
-                            Snacks.picker.project_init()
-                          end,
-                        },
-                      },
-                      project_init = {
-                        languages = {
-                          _ = "",
-                          c = "mkdir src && touch src/main.c",
-                          cpp = "mkdir src && touch src/main.cpp",
-                          go = "touch main.go && go mod init github.com/tnxz/",
-                          java = "mkdir src && touch src/main.java",
-                          python = "uv init",
-                          rust = "cargo init",
-                          zig = "zig init",
-                        },
-                        finder = function(opts)
-                          local ret = {}
-                          for key, _ in pairs(opts.languages) do
-                            table.insert(ret, { text = key })
-                          end
-                          return ret
-                        end,
-                        format = "text",
-                        layout = "dropdown",
-                        confirm = function(picker, item)
-                          picker:close()
-                          if not item then return end
-                          local ok, name = pcall(vim.fn.input, "New Project Name: ")
-                          if not ok or vim.trim(name) == "" then
-                            vim.notify("Empty Project Name", vim.log.levels.WARN)
-                            return
-                          end
-                          local cwd = vim.fn.expand("~/src/" .. name)
-                          vim.fn.mkdir(cwd, "p")
-                          local cmd = picker.opts.languages[item.text]
-                          if item.text == "go" then cmd = cmd .. name end
-                          local function find_main_file(dir)
-                            local files = vim.fn.glob(dir .. "/**/main.*", false, true, true)
-                            if #files > 0 then return files[1] end
-                            return nil
-                          end
-                          Snacks.picker.util.cmd("git init && " .. cmd, function(_, code)
-                            if code == 0 then
-                              vim.notify("project created successfully", vim.log.levels.INFO)
-                              vim.fn.chdir(cwd)
-                              local main = find_main_file(cwd)
-                              if main then vim.cmd("edit " .. main) end
-                            else
-                              vim.notify("Error creating project", vim.log.levels.ERROR)
-                            end
-                          end, { cwd = cwd })
-                        end,
-                      },
-                      zoxide = {
-                        win = {
-                          input = {
-                            keys = {
-                              ["<CR>"] = { { "cd", "picker_files" }, mode = { "n", "i" } },
-                              ["<c-x>"] = { "zoxide_remove", mode = { "i", "n" } },
-                            },
-                          },
-                          list = { keys = { ["<CR>"] = { "cd", "picker_files" }, ["dd"] = "zoxide_remove" } },
-                        },
-                        actions = {
-                          zoxide_remove = function(picker, item)
-                            if not item or not item.file then return end
-                            local path = item.file
-                            if picker._remove then return end
-                            picker._remove = true
-                            local cmd = { "zoxide", "remove", path }
-                            Snacks.picker.util.cmd(cmd, function()
-                              picker._remove = false
-                              picker:refresh()
-                            end)
-                          end,
-                        },
                       },
                     },
                     win = {
