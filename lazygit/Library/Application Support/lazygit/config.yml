@@ -1,0 +1,6 @@
+git:
+  autoFetch: false
+gui:
+  border: single
+  showBottomLine: false
+  showCommandLog: false
