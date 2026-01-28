@@ -1,15 +1,140 @@
----@diagnostic disable: undefined-global, duplicate-set-field
+local removing = setmetatable({}, { __mode = "k" })
+
+vim.cmd([[
+  set nosmd noswf nowb ph=10 noru ch=0 fcs=eob:\  sw=2 scs nowrap udf shm+=I scl=no
+  \ ic et ts=2 nosc ls=0 stal=0 so=7 ve=block gcr+=t:ver25-TermCursor mouse= spr sb
+]])
+
 local providers = { "python3", "node", "perl", "ruby" }
 for _, provider in ipairs(providers) do
   vim.g["loaded_" .. provider .. "_provider"] = 0
 end
 
-vim.cmd([[
-  set nosmd noswf nowb ph=10 scl=yes noru ch=0 fcs=eob:\  sw=2 scs spr sb nu nowrap udf
-  \ ic et shm+=I ts=2 nosc ls=0 stal=0 so=7 ve=block rnu gcr+=t:ver25-TermCursor mouse=
-]])
+vim.keymap.set("n", "<space>r", "<cmd>restart +qall!<cr>")
+vim.keymap.set("n", "<space><space>", "<cmd>update<cr>")
+vim.keymap.set("n", "<Tab>", "<C-w><C-w>")
+vim.keymap.set("n", "<A-j>", "<cmd>execute 'move .+' . v:count1<cr>==")
+vim.keymap.set("n", "<A-k>", "<cmd>execute 'move .-' . (v:count1 + 1)<cr>==")
+vim.keymap.set("i", "<A-j>", "<esc><cmd>m .+1<cr>==gi")
+vim.keymap.set("i", "<A-k>", "<esc><cmd>m .-2<cr>==gi")
+vim.keymap.set("v", "<A-j>", ":<C-u>execute \"'<,'>move '>+\" . v:count1<cr>gv=gv")
+vim.keymap.set("v", "<A-k>", ":<C-u>execute \"'<,'>move '<-\" . (v:count1 + 1)<cr>gv=gv")
+vim.keymap.set("n", "H", "<cmd>bprevious<cr>")
+vim.keymap.set("n", "L", "<cmd>bnext<cr>")
+vim.keymap.set("n", "n", "'Nn'[v:searchforward].'zv'", { expr = true })
+vim.keymap.set("x", "n", "'Nn'[v:searchforward]", { expr = true })
+vim.keymap.set("o", "n", "'Nn'[v:searchforward]", { expr = true })
+vim.keymap.set("n", "N", "'nN'[v:searchforward].'zv'", { expr = true })
+vim.keymap.set("x", "N", "'nN'[v:searchforward]", { expr = true })
+vim.keymap.set("o", "N", "'nN'[v:searchforward]", { expr = true })
+vim.keymap.set({ "i", "n", "s" }, "<esc>", "<cmd>noh<CR><esc>")
+vim.keymap.set("i", "<Tab>", function()
+  local col = vim.fn.col(".")
+  local line = vim.fn.getline(".")
+  local char = line:sub(col, col)
+  if char:match("[%(%)%{%}%[%]<>\"';:,]") then
+    return "<Right>"
+  else
+    return "<Tab>"
+  end
+end, { expr = true, silent = true })
+vim.keymap.set("i", "<S-Tab>", function()
+  local col = vim.fn.col(".")
+  local line = vim.fn.getline(".")
+  local char = line:sub(col - 1, col - 1)
+  if char:match("[%(%)%{%}%[%]<>\"';:,]") then
+    return "<Left>"
+  else
+    return "<S-Tab>"
+  end
+end, { expr = true, silent = true })
+
+vim.g.clipboard = "pbcopy"
 
 vim.schedule(function() vim.o.clipboard = "unnamedplus" end)
+
+vim.api.nvim_create_autocmd("TextYankPost", {
+  group = vim.api.nvim_create_augroup("highlight_yank", { clear = true }),
+  callback = function() vim.hl.on_yank() end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  group = vim.api.nvim_create_augroup("no_auto_comment", { clear = true }),
+  command = "setlocal formatoptions-=cro",
+})
+
+vim.api.nvim_create_autocmd("BufReadPost", {
+  group = vim.api.nvim_create_augroup("restore_cursor", { clear = true }),
+  callback = function(event)
+    local exclude = { "gitcommit" }
+    local buf = event.buf
+    if vim.tbl_contains(exclude, vim.bo[buf].filetype) or vim.b[buf].last_loc then return end
+    vim.b[buf].last_loc = true
+    local mark = vim.api.nvim_buf_get_mark(buf, '"')
+    local lcount = vim.api.nvim_buf_line_count(buf)
+    if mark[1] > 0 and mark[1] <= lcount then pcall(vim.api.nvim_win_set_cursor, 0, mark) end
+  end,
+})
+
+vim.api.nvim_create_autocmd("BufWritePre", {
+  group = vim.api.nvim_create_augroup("save_mkdir", { clear = true }),
+  callback = function(event)
+    if event.match:match("^%w%w+:[\\/][\\/]") then return end
+    local file = vim.uv.fs_realpath(event.match) or event.match
+    vim.fn.mkdir(vim.fn.fnamemodify(file, ":p:h"), "p")
+  end,
+})
+
+vim.api.nvim_create_autocmd({ "BufUnload", "BufDelete" }, {
+  group = vim.api.nvim_create_augroup("lsp_unload", { clear = true }),
+  callback = function()
+    vim.defer_fn(function()
+      for _, client in pairs(vim.lsp.get_clients()) do
+        local is_attached = false
+        for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+          if vim.lsp.buf_is_attached(buf, client.id) then
+            is_attached = true
+            break
+          end
+        end
+        if not is_attached then client:stop() end
+      end
+    end, 100)
+  end,
+})
+
+vim.api.nvim_create_autocmd({ "TermRequest" }, {
+  group = vim.api.nvim_create_augroup("term_osc7", { clear = true }),
+  callback = function(ev)
+    local val, n = string.gsub(ev.data.sequence, "\027]7;file://[^/]*", "")
+    if n > 0 then
+      local dir = val
+      if vim.fn.isdirectory(dir) == 0 then
+        vim.notify("invalid dir: " .. dir)
+        return
+      end
+      vim.b[ev.buf].osc7_dir = dir
+      if vim.api.nvim_get_current_buf() == ev.buf then vim.cmd.cd(dir) end
+    end
+  end,
+})
+
+vim.api.nvim_create_autocmd({ "TermEnter" }, {
+  group = vim.api.nvim_create_augroup("term_cwd_sync", { clear = true }),
+  callback = function()
+    local pid = vim.b.terminal_job_pid
+    if pid then
+      local proc = vim.api.nvim_get_proc(pid)
+      if proc then
+        local shell = proc.name
+        local pids = #(vim.api.nvim_get_proc_children(pid) or {})
+        if shell == "zsh" and pids == 0 and vim.b.osc7_dir and vim.b.osc7_dir ~= vim.uv.cwd() then
+          vim.api.nvim_chan_send(vim.b.terminal_job_id, "\x1b0Dicd '" .. vim.uv.cwd() .. "'\r")
+        end
+      end
+    end
+  end,
+})
 
 local tokyopath = vim.fn.stdpath("data") .. "/lazy/tokyonight.nvim"
 local tokyorepo = "https://github.com/folke/tokyonight.nvim.git"
@@ -51,12 +176,36 @@ require("lazy").setup({
   default = { lazy = true },
   spec = {
 
+    {
+      "nvim-treesitter/nvim-treesitter",
+      build = ":TSUpdate",
+      event = { "BufReadPost", "BufNewFile", "BufWritePre", "VeryLazy" },
+      cmd = { "TSUpdate", "TSInstall", "TSLog", "TSUninstall" },
+    },
+
+    {
+      "MeanderingProgrammer/treesitter-modules.nvim",
+      event = { "BufReadPost", "BufNewFile", "BufWritePre", "VeryLazy" },
+      opts = {
+        highlight = { enable = true },
+        indent = { enable = true },
+        incremental_selection = { enable = true },
+        auto_install = true,
+      },
+    },
+
+    {
+      "mason-org/mason.nvim",
+      lazy = false,
+      opts = {},
+    },
+
     "folke/tokyonight.nvim",
+    "MunifTanjim/nui.nvim",
 
     {
       "folke/noice.nvim",
       event = "VeryLazy",
-      dependencies = { "MunifTanjim/nui.nvim" },
       keys = { { "<space>m", "<cmd>NoiceAll<cr>" } },
       opts = {
         lsp = {
@@ -80,11 +229,7 @@ require("lazy").setup({
           },
         },
         views = {
-          cmdline_popup = {
-            border = "none",
-            position = { row = 0, col = 0 },
-            size = { width = "auto", height = 1 },
-          },
+          cmdline_popup = { border = "none", position = { row = 0, col = 0 }, size = { width = "auto", height = 1 } },
           popupmenu = {
             border = { style = "none", padding = { 0, 1 } },
             position = { row = 1, col = 0 },
@@ -107,7 +252,7 @@ require("lazy").setup({
       keys = { { "-", "<cmd>Oil<cr>" }, { "_", "<cmd>Oil .<cr>" } },
       opts = {
         keymaps = { ["`"] = false, ["q"] = { "actions.close", mode = "n" } },
-        view_options = { show_hidden = true },
+        view_options = { show_hidden = true, is_always_hidden = function(name, _) return name == ".." end },
         delete_to_trash = true,
         skip_confirm_for_simple_edits = true,
         float = { border = "single" },
@@ -128,7 +273,20 @@ require("lazy").setup({
       opts = { modes = { char = { keys = {} } } },
     },
 
-    { "nvim-mini/mini.pairs", event = "VeryLazy", opts = {} },
+    {
+      "nvim-mini/mini.pairs",
+      event = "VeryLazy",
+      config = function()
+        require("mini.pairs").setup()
+        vim.api.nvim_create_autocmd("FileType", {
+          pattern = "nix",
+          callback = function()
+            require("mini.pairs").map_buf(0, "i", "=", { action = "open", pair = "=;", register = { cr = false } })
+            require("mini.pairs").map_buf(0, "i", ";", { action = "close", pair = "=;", register = { cr = false } })
+          end,
+        })
+      end,
+    },
 
     {
       "nvim-mini/mini.surround",
@@ -188,150 +346,64 @@ require("lazy").setup({
     },
 
     {
+      "iamcco/markdown-preview.nvim",
+      cmd = { "MarkdownPreviewToggle", "MarkdownPreview", "MarkdownPreviewStop" },
+      ft = { "markdown" },
+      build = ":call mkdp#util#install()",
+    },
+
+    {
       "willothy/flatten.nvim",
       lazy = false,
       opts = {
         window = { open = "alternate" },
-        hooks = {
-          pre_open = function() require("snacks").terminal.toggle() end,
-        },
+        hooks = { pre_open = function() Snacks.terminal.toggle() end },
       },
+    },
+
+    {
+      "folke/persistence.nvim",
+      event = "BufReadPre",
+      keys = { { "<space>t", function() require("persistence").save() end } },
+      opts = {},
     },
 
     {
       "folke/snacks.nvim",
       priority = 2000,
       lazy = false,
-      dependencies = { { "folke/persistence.nvim", event = "BufReadPre", opts = {} } },
       keys = {
         { "<space>.", function() Snacks.scratch.open() end },
         { "<space>S", function() Snacks.scratch.select() end },
-
-        { "<space>;", function() Snacks.picker.buffers() end },
-        { "<space>,", function() Snacks.picker.buffers({ filter = { cwd = Snacks.git.get_root() } }) end },
-        { "<space>q", function() Snacks.bufdelete.delete({ force = true }) end },
+        { "<space>,", function() Snacks.picker.recent() end },
+        { "<space>b", function() Snacks.picker.buffers() end },
+        { "<space>B", function() Snacks.picker.buffers({ filter = { cwd = Snacks.git.get_root() } }) end },
+        { "<space>d", function() Snacks.bufdelete.delete({ force = true }) end },
         { "<space>o", function() Snacks.bufdelete.other({ force = true }) end },
-        { "<space>Q", function() Snacks.bufdelete.all({ force = true }) end },
-
+        { "<space>q", function() Snacks.bufdelete.all({ force = true }) end },
         { "<space>/", function() Snacks.picker.grep({ dirs = { Snacks.git.get_root() } }) end },
         { "<space>?", function() Snacks.picker.grep_buffers() end },
-
         { "<space>e", function() Snacks.picker.explorer({ cwd = Snacks.git.get_root() }) end },
-
         { "<space>x", function() Snacks.picker.diagnostics_buffer() end },
         { "<space>X", function() Snacks.picker.diagnostics({ filter = { cwd = Snacks.git.get_root() } }) end },
-
-        { "<space>f", function() Snacks.picker.files() end },
-        { "ff", function() Snacks.picker.files({ cwd = Snacks.git.get_root() }) end },
-        { "<space>c", function() Snacks.picker.files({ cwd = "~/src/zx" }) end },
-
         { "<space>v", function() Snacks.picker.projects() end },
-        { "<space>E", function() Snacks.picker.project_init() end },
-        { "<space>C", function() Snacks.picker.zoxide() end },
-
         {
-          "<space>g",
+          "<space>E",
           function()
-            if Snacks.git.get_root() then
-              Snacks.lazygit({ cwd = Snacks.git.get_root() })
-            else
-              vim.notify("Not in a Git repository", vim.log.levels.ERROR)
-            end
-          end,
-        },
-
-        { "<space>s", function() Snacks.picker.pickers() end },
-
-        { "<space>r", function() Snacks.picker.recent() end },
-        { "<space>h", function() Snacks.picker.help() end },
-        { "<space>i", function() Snacks.picker.icons() end },
-        { "<space>u", function() Snacks.picker.undo() end },
-        { "<space>y", function() Snacks.picker.spelling() end },
-
-        { mode = { "n", "t" }, "`", function() Snacks.terminal.toggle() end },
-      },
-      opts = {
-        bigfile = { enabled = true },
-        quickfile = { enabled = true },
-        statuscolumn = { enabled = true },
-        input = { icon = "", prompt_pos = "left", win = { border = "none", width = vim.o.co, row = 0, col = 0 } },
-        terminal = { win = { wo = { winbar = "" } } },
-        lazygit = { win = { keys = { term_normal = { "<esc>" } } } },
-        scratch = { win = { position = "top" } },
-        picker = {
-          prompt = "",
-          sources = {
-            files = { hidden = true },
-            grep = { hidden = true },
-            explorer = {
-              hidden = true,
-              auto_close = true,
-              win = {
-                input = {
-                  keys = {
-                    ["<S-Tab>"] = { "select_and_prev", mode = { "i", "n" } },
-                    ["<Tab>"] = { "select_and_next", mode = { "i", "n" } },
-                  },
-                },
-                list = {
-                  keys = {
-                    ["o"] = "explorer_add",
-                    ["<S-Tab>"] = { "select_and_prev", mode = { "n", "x" } },
-                    ["<Tab>"] = { "select_and_next", mode = { "n", "x" } },
-                  },
-                },
-              },
-            },
-            projects = {
-              dev = "~/src",
-              recent = false,
-              win = {
-                input = {
-                  keys = {
-                    ["<c-x>"] = { "project_remove", mode = { "i", "n" } },
-                    ["<c-n>"] = { "project_init", mode = { "i", "n" } },
-                  },
-                },
-                list = { keys = { ["dd"] = "project_remove", ["<n>"] = "project_init" } },
-              },
-              actions = {
-                project_remove = function(picker, item)
-                  if not item or not item.file then return end
-                  local path = item.file
-                  if picker._project_removing then return end
-                  picker._project_removing = true
-                  local cwd = vim.uv.cwd()
-                  if cwd and cwd:match("^" .. vim.pesc(path)) then vim.cmd("cd ~/src/") end
-                  local ok, err = require("snacks.explorer.actions").trash(path)
-                  if ok then
-                    if cwd == path then Snacks.bufdelete.all({ force = true }) end
-                    picker:refresh()
-                    vim.notify("Project deleted: " .. path)
-                  else
-                    vim.notify("Failed to delete project:\n" .. err, vim.log.levels.ERROR)
-                  end
-                  picker._project_removing = false
-                end,
-                project_init = function(picker)
-                  picker:close()
-                  Snacks.picker.project_init()
-                end,
-              },
-            },
-            project_init = {
-              languages = {
-                _ = "",
-                c = "mkdir src && touch src/main.c",
-                cpp = "mkdir src && touch src/main.cpp",
-                go = "touch main.go && ",
-                java = "mkdir src && touch src/main.java",
-                python = "uv init",
-                rust = "cargo init",
-                zig = "zig init",
-              },
-              finder = function(opts)
+            local languages = {
+              _ = ":",
+              c = "mkdir src && touch src/main.c",
+              cpp = "mkdir src && touch src/main.cpp",
+              go = "mkdir src && touch src/main.go",
+              java = "mkdir src && touch src/main.java",
+              python = "uv init && mkdir -p src && mv main.py src",
+              rust = "cargo init",
+              zig = "zig init",
+            }
+            Snacks.picker.pick({
+              finder = function()
                 local ret = {}
-                for key, _ in pairs(opts.languages) do
+                for key, _ in pairs(languages) do
                   table.insert(ret, { text = key })
                 end
                 return ret
@@ -348,24 +420,139 @@ require("lazy").setup({
                 end
                 local cwd = vim.fn.expand("~/src/" .. name)
                 vim.fn.mkdir(cwd, "p")
-                local cmd = picker.opts.languages[item.text]
-                if item.text == "go" then cmd = cmd .. "go mod init " .. name end
-                local function find_main_file(dir)
-                  local files = vim.fn.glob(dir .. "/**/main.*", false, true, true)
-                  if #files > 0 then return files[1] end
-                  return nil
+                local cmd = languages[item.text]
+                cmd = "git init && " .. cmd
+                if item.text == "go" then cmd = cmd .. " && go mod init " .. name end
+                vim.system({ "sh", "-c", cmd }, { cwd = cwd }):wait()
+                if vim.v.shell_error == 0 then
+                  vim.notify("project created successfully", vim.log.levels.INFO)
+                  vim.fn.chdir(cwd)
+                  local main_file = vim.fn.glob(cwd .. "/src/main.*")
+                  if main_file ~= "" then vim.cmd("edit " .. main_file) end
+                else
+                  vim.notify("Error creating project", vim.log.levels.ERROR)
                 end
-                Snacks.picker.util.cmd("git init && " .. cmd, function(_, code)
-                  if code == 0 then
-                    vim.notify("project created successfully", vim.log.levels.INFO)
-                    vim.fn.chdir(cwd)
-                    local main = find_main_file(cwd)
-                    if main then vim.cmd("edit " .. main) end
-                  else
-                    vim.notify("Error creating project", vim.log.levels.ERROR)
-                  end
-                end, { cwd = cwd })
               end,
+            })
+          end,
+        },
+        { "<space>C", function() Snacks.picker.zoxide() end },
+        { "<space>g", function() Snacks.lazygit() end },
+        { "<space>s", function() Snacks.picker.pickers() end },
+        { "<space>h", function() Snacks.picker.help() end },
+        { "<space>i", function() Snacks.picker.icons() end },
+        { "<space>u", function() Snacks.picker.undo() end },
+        { "<space>y", function() Snacks.picker.spelling() end },
+        { "<space>f", function() Snacks.picker.files() end },
+        {
+          "<space>T",
+          function()
+            Snacks.picker.pick({
+              finder = function()
+                local list = {}
+                for _, session in ipairs(require("persistence").list()) do
+                  local session_name = session
+                    :gsub(vim.fn.stdpath("state") .. "/sessions/", "")
+                    :gsub(".vim$", "")
+                    :gsub("%%", "/")
+                    :gsub(vim.env.HOME, "~")
+                  table.insert(list, { text = session_name, file = session })
+                end
+                return list
+              end,
+              format = "text",
+              layout = "dropdown",
+              confirm = function(picker, item)
+                picker:close()
+                if not item then return end
+                local dir = item.text
+                local session_loaded = false
+                vim.api.nvim_create_autocmd("SessionLoadPost", {
+                  once = true,
+                  callback = function() session_loaded = true end,
+                })
+                vim.defer_fn(function()
+                  if not session_loaded then Snacks.picker.files() end
+                end, 100)
+                vim.fn.chdir(dir)
+                require("persistence").load()
+              end,
+              win = {
+                input = { keys = { ["<c-x>"] = { "session_remove", mode = { "i", "n" } } } },
+                list = { keys = { ["dd"] = "session_remove" } },
+              },
+              actions = {
+                session_remove = function(picker, item)
+                  if not item or not item.file then return end
+                  local path = item.file
+                  if removing[picker] then return end
+                  removing[picker] = true
+                  Snacks.picker.util.cmd({ "rm", path }, function()
+                    removing[picker] = nil
+                    picker:refresh()
+                  end)
+                end,
+              },
+            })
+          end,
+        },
+        { mode = { "n", "t" }, "`", function() Snacks.terminal.toggle() end },
+      },
+      opts = {
+        bigfile = { enabled = true },
+        quickfile = { enabled = true },
+        statuscolumn = { enabled = true },
+        input = { icon = "", prompt_pos = "left", win = { border = "none", row = 0, col = 0 } },
+        terminal = { win = { position = "float", height = 0, width = 0 } },
+        lazygit = { win = { position = "float", height = 0, width = 0, keys = { term_normal = { "<esc>" } } } },
+        scratch = { win = { position = "top" } },
+        picker = {
+          prompt = "",
+          formatters = { selected = { show_always = true, unselected = true } },
+          sources = {
+            files = { hidden = true },
+            grep = { hidden = true },
+            explorer = { hidden = true, auto_close = true, win = { list = { keys = { ["o"] = "explorer_add" } } } },
+            projects = {
+              dev = "~/src",
+              recent = false,
+              win = {
+                input = {
+                  keys = {
+                    ["<c-x>"] = { "project_remove", mode = { "i", "n" } },
+                  },
+                },
+                list = { keys = { ["dd"] = "project_remove" } },
+              },
+              actions = {
+                project_remove = function(picker)
+                  if removing[picker] then return end
+                  removing[picker] = true
+                  local items = picker:selected({ fallback = true })
+                  local cwd = vim.uv.cwd()
+                  local refresh_needed = false
+                  for _, item in ipairs(items) do
+                    if item and item.file then
+                      local path = item.file
+                      if not path then return end
+                      local was_cwd = (cwd == path)
+                      if cwd and cwd:match("^" .. vim.pesc(path)) then vim.cmd("cd ~/src/") end
+                      local ok, err = require("snacks.explorer.actions").trash(path)
+                      if ok then
+                        if was_cwd then Snacks.bufdelete.all({ force = true }) end
+                        vim.notify("Project deleted: " .. path)
+                        refresh_needed = true
+                      else
+                        vim.notify("Failed to delete project:\n" .. err, vim.log.levels.ERROR)
+                      end
+                      local session = vim.fn.stdpath("state") .. "/sessions/" .. path:gsub("[\\/:]+", "%%") .. ".vim"
+                      if vim.uv.fs_stat(session) then require("snacks.explorer.actions").trash(session) end
+                    end
+                  end
+                  if refresh_needed then picker:refresh() end
+                  removing[picker] = nil
+                end,
+              },
             },
             zoxide = {
               win = {
@@ -373,27 +560,47 @@ require("lazy").setup({
                 list = { keys = { ["dd"] = "zoxide_remove" } },
               },
               actions = {
-                zoxide_remove = function(picker, item)
-                  if not item or not item.file then return end
-                  local path = item.file
-                  if picker._zoxide_removing then return end
-                  picker._zoxide_removing = true
-                  Snacks.picker.util.cmd({ "zoxide", "remove", path }, function()
-                    picker._zoxide_removing = false
+                zoxide_remove = function(picker)
+                  if removing[picker] then return end
+                  removing[picker] = true
+
+                  local items = picker:selected({ fallback = true })
+                  local paths = {}
+
+                  for _, item in ipairs(items) do
+                    if item and item.file then table.insert(paths, item.file) end
+                  end
+
+                  if #paths == 0 then
+                    removing[picker] = nil
+                    return
+                  end
+
+                  Snacks.picker.util.cmd(vim.list_extend({ "zoxide", "remove" }, paths), function()
+                    removing[picker] = nil
                     picker:refresh()
                   end)
                 end,
               },
             },
           },
-          win = {
-            input = {
-              keys = {
-                ["<Tab>"] = { "list_down", mode = { "i", "n" } },
-                ["<S-Tab>"] = { "list_up", mode = { "i", "n" } },
-              },
-            },
-            list = { keys = { ["<Tab>"] = "list_down", ["<S-Tab>"] = "list_up" } },
+          actions = {
+            load_session = function(picker, item)
+              picker:close()
+              if not item then return end
+              local dir = item.file
+              if not dir then return end
+              local session_loaded = false
+              vim.api.nvim_create_autocmd("SessionLoadPost", {
+                once = true,
+                callback = function() session_loaded = true end,
+              })
+              vim.defer_fn(function()
+                if not session_loaded then Snacks.picker.files() end
+              end, 100)
+              vim.fn.chdir(dir)
+              require("persistence").load()
+            end,
           },
           previewers = { diff = { style = "syntax", wo = { wrap = false } } },
           layouts = {
@@ -415,7 +622,7 @@ require("lazy").setup({
             },
             dropdown = {
               cycle = true,
-              preview = false,
+              hidden = { "preview" },
               layout = {
                 width = 70,
                 min_width = 70,
@@ -431,7 +638,7 @@ require("lazy").setup({
             },
             select = {
               cycle = true,
-              preview = false,
+              hidden = { "preview" },
               layout = {
                 width = 70,
                 min_width = 70,
@@ -447,7 +654,7 @@ require("lazy").setup({
             },
             vscode = {
               cycle = true,
-              preview = false,
+              hidden = { "preview" },
               layout = {
                 width = 70,
                 min_width = 70,
@@ -463,7 +670,7 @@ require("lazy").setup({
             },
             vertical = {
               cycle = true,
-              preview = false,
+              hidden = { "preview" },
               layout = {
                 width = 70,
                 min_width = 70,
@@ -532,9 +739,56 @@ require("lazy").setup({
               },
             },
           },
+          icons = {
+            diagnostics = { Error = "E", Warn = "W", Hint = "H", Info = "I" },
+            git = {
+              staged = "S",
+              added = "A",
+              deleted = "D",
+              ignored = "I",
+              modified = "M",
+              renamed = "R",
+              untracked = "?",
+            },
+            files = { enabled = false },
+            ui = { selected = " ■ ", unselected = " □ " },
+          },
         },
       },
       config = function(_, opts)
+        Snacks.setup(opts)
+
+        Snacks.picker.format.selected = function(item, picker)
+          local a = Snacks.picker.util.align
+          local selected = picker.opts.icons.ui.selected
+          local unselected = picker.opts.icons.ui.unselected
+          local width = math.max(vim.api.nvim_strwidth(selected), vim.api.nvim_strwidth(unselected))
+          local ret = {}
+          if picker.list:is_selected(item) then
+            ret[#ret + 1] = {
+              virt_text = { { a(selected, width), "SnacksPickerSelected" } },
+              virt_text_pos = "right_align",
+              hl_mode = "combine",
+            }
+            ret[#ret + 1] = { " ", virtual = true }
+          elseif picker.opts.formatters.selected.unselected then
+            ret[#ret + 1] = {
+              virt_text = { { a(unselected, width), "SnacksPickerUnselected" } },
+              virt_text_pos = "right_align",
+              hl_mode = "combine",
+            }
+            ret[#ret + 1] = { " ", virtual = true }
+          else
+            ret[#ret + 1] = {
+              virt_text = { { a("", width) } },
+              virt_text_pos = "right_align",
+              hl_mode = "combine",
+            }
+            ret[#ret + 1] = { " ", virtual = true }
+          end
+          return ret
+        end
+
         Snacks.terminal.tid = function(cmd, opt)
           return vim.inspect({
             cmd = type(cmd) == "table" and cmd or { cmd },
@@ -542,17 +796,31 @@ require("lazy").setup({
             count = opt.count or vim.v.count1,
           })
         end
-        Snacks.setup(opts)
+
+        vim.api.nvim_create_autocmd({ "BufEnter", "TextChanged", "TextChangedI" }, {
+          group = vim.api.nvim_create_augroup("misc", { clear = true }),
+          callback = function()
+            local ft = vim.bo.filetype
+            if vim.tbl_contains({ "man", "help", "lazy" }, ft) then
+              vim.cmd.setlocal("scl=no stc= nonu nornu")
+              return
+            end
+            if vim.bo.buftype ~= "" then return end
+            local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+            if #lines == 1 and lines[1] == "" then
+              vim.cmd.setlocal("scl=no stc= nonu nornu")
+            else
+              vim.cmd.setlocal("scl=yes nu rnu stc=%!v:lua.require'snacks.statuscolumn'.get()")
+            end
+          end,
+        })
       end,
     },
 
     {
       "CRAG666/code_runner.nvim",
       cmd = { "RunCode", "RunFile", "RunProject", "RunClose", "CRFiletype", "CRProjects" },
-      keys = { {
-        "<space>b",
-        function() require("code_runner").run_code() end,
-      } },
+      keys = { { "R", function() require("code_runner").run_code() end } },
       config = function()
         local function run(args)
           return function()
@@ -582,11 +850,7 @@ require("lazy").setup({
             },
             java = "java $fileNameWithoutExt",
             python = "uv run",
-            go = run({
-              root_marker = "go.mod",
-              project_cmd = { "go build -o target &&", "$dir/target &&", "rm $dir/target" },
-              file_cmd = "go run $filename",
-            }),
+            go = "go run $filename",
             rust = run({
               root_marker = "Cargo.toml",
               project_cmd = "cargo run $end",
@@ -607,10 +871,24 @@ require("lazy").setup({
       "neovim/nvim-lspconfig",
       init = function()
         vim.lsp.enable({ "lua_ls", "pyright", "clangd", "gopls", "jdtls", "rust_analyzer", "ts_ls", "zls" })
-        vim.lsp.config(
-          "lua_ls",
-          { settings = { Lua = { workspace = { library = vim.api.nvim_get_runtime_file("", true) } } } }
-        )
+        local runtime_path = {}
+        for _, path in ipairs(vim.api.nvim_get_runtime_file("", true)) do
+          if path:match("/lua$") then table.insert(runtime_path, path) end
+        end
+        vim.lsp.config("lua_ls", {
+          settings = {
+            Lua = {
+              runtime = { version = "LuaJIT", path = vim.split(package.path, ";") },
+              diagnostics = { globals = { "vim", "Snacks" } },
+              workspace = {
+                ignoreSubmodules = true,
+                library = runtime_path,
+                checkThirdParty = false,
+              },
+              telemetry = { enable = false },
+            },
+          },
+        })
         vim.lsp.config("pyright", { settings = { python = { pythonPath = ".venv/bin/python" } } })
       end,
     },
@@ -652,10 +930,11 @@ require("lazy").setup({
       },
     },
 
+    "rafamadriz/friendly-snippets",
+
     {
       "Saghen/blink.cmp",
       version = "*",
-      dependencies = { "rafamadriz/friendly-snippets" },
       event = "InsertEnter",
       opts = {
         appearance = { nerd_font_variant = "normal" },
@@ -685,144 +964,16 @@ require("lazy").setup({
           documentation = {
             auto_show = true,
             auto_show_delay_ms = 0,
-            window = {
-              winhighlight = "Normal:Pmenu",
-              scrollbar = false,
-            },
+            window = { winhighlight = "Normal:Pmenu", scrollbar = false },
           },
         },
         cmdline = { enabled = false },
-        sources = {
-          default = { "lsp", "path", "snippets", "buffer" },
-          providers = { lsp = { fallbacks = {} } },
-        },
+        sources = { default = { "lsp", "path", "snippets", "buffer" }, providers = { lsp = { fallbacks = {} } } },
         signature = { enabled = true, window = { winhighlight = "Normal:Pmenu" } },
       },
       init = function() vim.lsp.config("*", { capabilities = require("blink.cmp").get_lsp_capabilities() }) end,
     },
   },
-})
-
-vim.keymap.set("n", "<space>R", "<cmd>cd ~/src/ | restart +qall!<cr>")
-vim.keymap.set("n", "<space><space>", "<cmd>update<cr>")
-vim.keymap.set("n", "<Tab>", "<C-w><C-w>")
-vim.keymap.set("n", "<A-j>", "<cmd>execute 'move .+' . v:count1<cr>==")
-vim.keymap.set("n", "<A-k>", "<cmd>execute 'move .-' . (v:count1 + 1)<cr>==")
-vim.keymap.set("i", "<A-j>", "<esc><cmd>m .+1<cr>==gi")
-vim.keymap.set("i", "<A-k>", "<esc><cmd>m .-2<cr>==gi")
-vim.keymap.set("v", "<A-j>", ":<C-u>execute \"'<,'>move '>+\" . v:count1<cr>gv=gv")
-vim.keymap.set("v", "<A-k>", ":<C-u>execute \"'<,'>move '<-\" . (v:count1 + 1)<cr>gv=gv")
-vim.keymap.set("n", "H", "<cmd>bprevious<cr>")
-vim.keymap.set("n", "L", "<cmd>bnext<cr>")
-vim.keymap.set("n", "n", "'Nn'[v:searchforward].'zv'", { expr = true })
-vim.keymap.set("x", "n", "'Nn'[v:searchforward]", { expr = true })
-vim.keymap.set("o", "n", "'Nn'[v:searchforward]", { expr = true })
-vim.keymap.set("n", "N", "'nN'[v:searchforward].'zv'", { expr = true })
-vim.keymap.set("x", "N", "'nN'[v:searchforward]", { expr = true })
-vim.keymap.set("o", "N", "'nN'[v:searchforward]", { expr = true })
-vim.keymap.set({ "i", "n", "s" }, "<esc>", "<cmd>noh<CR><esc>")
-vim.keymap.set("i", "<Tab>", function()
-  local col = vim.fn.col(".")
-  local line = vim.fn.getline(".")
-  local char = line:sub(col, col)
-  if char:match("[%(%)%{%}%[%]<>\"']") then
-    return "<Right>"
-  else
-    return "<Tab>"
-  end
-end, { expr = true, silent = true })
-vim.keymap.set("i", "<S-Tab>", function()
-  local col = vim.fn.col(".")
-  local line = vim.fn.getline(".")
-  local char = line:sub(col - 1, col - 1)
-  if char:match("[%(%)%{%}%[%]<>\"']") then
-    return "<Left>"
-  else
-    return "<S-Tab>"
-  end
-end, { expr = true, silent = true })
-
-vim.api.nvim_create_autocmd("TextYankPost", {
-  group = vim.api.nvim_create_augroup("highlight_yank", { clear = true }),
-  callback = function() vim.hl.on_yank() end,
-})
-
-vim.api.nvim_create_autocmd("FileType", {
-  group = vim.api.nvim_create_augroup("no_auto_comment", { clear = true }),
-  command = "setlocal formatoptions-=cro",
-})
-
-vim.api.nvim_create_autocmd("BufReadPost", {
-  group = vim.api.nvim_create_augroup("restore_cursor", { clear = true }),
-  callback = function(event)
-    local exclude = { "gitcommit" }
-    local buf = event.buf
-    if vim.tbl_contains(exclude, vim.bo[buf].filetype) or vim.b[buf].last_loc then return end
-    vim.b[buf].last_loc = true
-    local mark = vim.api.nvim_buf_get_mark(buf, '"')
-    local lcount = vim.api.nvim_buf_line_count(buf)
-    if mark[1] > 0 and mark[1] <= lcount then pcall(vim.api.nvim_win_set_cursor, 0, mark) end
-  end,
-})
-
-vim.api.nvim_create_autocmd("BufWritePre", {
-  group = vim.api.nvim_create_augroup("save_mkdir", { clear = true }),
-  callback = function(event)
-    if event.match:match("^%w%w+:[\\/][\\/]") then return end
-    local file = vim.uv.fs_realpath(event.match) or event.match
-    vim.fn.mkdir(vim.fn.fnamemodify(file, ":p:h"), "p")
-  end,
-})
-
-vim.api.nvim_create_autocmd({ "BufUnload", "BufDelete" }, {
-  group = vim.api.nvim_create_augroup("lsp_unload", { clear = true }),
-  callback = function()
-    vim.defer_fn(function()
-      for _, client in pairs(vim.lsp.get_clients()) do
-        local is_attached = false
-        for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-          if vim.lsp.buf_is_attached(buf, client.id) then
-            is_attached = true
-            break
-          end
-        end
-        if not is_attached then client:stop() end
-      end
-    end, 100)
-  end,
-})
-
-vim.api.nvim_create_autocmd({ "TermRequest" }, {
-  group = vim.api.nvim_create_augroup("term_osc7", { clear = true }),
-  callback = function(ev)
-    local val, n = string.gsub(ev.data.sequence, "\027]7;file://[^/]*/", "")
-    if n > 0 then
-      local dir = val
-      if vim.fn.isdirectory(dir) == 0 then
-        vim.notify("invalid dir: " .. dir)
-        return
-      end
-      vim.b[ev.buf].osc7_dir = dir
-      if vim.api.nvim_get_current_buf() == ev.buf then vim.cmd.cd(dir) end
-    end
-  end,
-})
-
-vim.api.nvim_create_autocmd({ "TermEnter" }, {
-  group = vim.api.nvim_create_augroup("term_cwd_sync", { clear = true }),
-  callback = function()
-    local pid = vim.b.terminal_job_pid
-    if pid then
-      local proc = vim.api.nvim_get_proc(pid)
-      if proc then
-        local shell = proc.name
-        local pids = #(vim.api.nvim_get_proc_children(pid) or {})
-        if shell == "zsh" and pids == 0 and vim.b.osc7_dir and vim.b.osc7_dir ~= vim.uv.cwd() then
-          vim.api.nvim_chan_send(vim.b.terminal_job_id, "\x1b0Dicd '" .. vim.uv.cwd() .. "'\r")
-        end
-      end
-    end
-  end,
 })
 
 if INSTALL then vim.cmd("helptags ALL || restart") end

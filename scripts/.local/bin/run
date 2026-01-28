@@ -24,4 +24,4 @@ eval "$(/opt/homebrew/bin/brew shellenv)"
     */
 )
 
-brew bundle --verbose --zap --cleanup --file "$SRC/homebrew/.Brewfile"
+brew bundle --verbose --zap --cleanup --file "$SRC/homebrew/.homebrew/Brewfile" && brew upgrade -g

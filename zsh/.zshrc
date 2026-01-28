@@ -11,8 +11,9 @@ autoload -Uz add-zsh-hook
 add-zsh-hook -Uz chpwd print_osc7
 print_osc7
 
-setopt interactivecomments appendhistory sharehistory incappendhistory histignorealldups
+setopt APPEND_HISTORY SHARE_HISTORY EXTENDED_HISTORY HIST_FCNTL_LOCK HIST_IGNORE_ALL_DUPS HIST_SAVE_NO_DUPS HIST_EXPIRE_DUPS_FIRST HIST_IGNORE_SPACE INTERACTIVE_COMMENTS HIST_REDUCE_BLANKS INC_APPEND_HISTORY
 
+HISTORY_IGNORE="(l|c|ll|ls|cd|pwd|exit|z|z -|z ..)"
 HISTSIZE=10000000
 SAVEHIST=10000000
 
@@ -22,8 +23,9 @@ autoload -Uz compinit
 compinit
 _comp_options+=(globdots)
 
+KEYTIMEOUT=1
+
 bindkey -v
-export KEYTIMEOUT=1
 
 function zle-keymap-select zle-line-init {
   case $KEYMAP in
@@ -33,6 +35,8 @@ function zle-keymap-select zle-line-init {
 }
 zle -N zle-line-init
 zle -N zle-keymap-select
+
+function preexec { print -n '\e[2 q' }
 
 function vi-yank-pbcopy { zle vi-yank; echo "$CUTBUFFER" | pbcopy }
 zle -N vi-yank-pbcopy
@@ -64,14 +68,19 @@ bindkey -M viins "^P" history-search-backward
 bindkey -M viins "^N" history-search-forward
 bindkey -M menuselect "\e" send-break
 
-alias ll="ls -AS"
+alias ll="ls -ASlh"
 alias c="printf '\e[H\e[3J'"
 alias l="ls -AS"
 
 if (( $+commands[fzf] )); then
+  FZF_DEFAULT_OPTS="--bind 'tab:down,shift-tab:up' --cycle"
   source <(fzf --zsh)
   bindkey -M vicmd '/' fzf-history-widget
   bindkey -M vicmd '?' fzf-history-widget
+fi
+
+if (( $+commands[mise] )); then
+  eval "$(mise completion zsh)"
 fi
 
 if (( $+commands[nvim] )); then
@@ -87,3 +96,5 @@ fi
 if (( $+commands[zoxide] )); then
   eval "$(zoxide init zsh)"
 fi
+
+prompt="%m %1~ # "

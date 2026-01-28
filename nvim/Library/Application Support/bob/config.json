@@ -1,5 +1,0 @@
-{
-  "installation_location": "$HOME/.local/bin",
-  "rollback_limit": 0,
-  "add_neovim_binary_to_path": false
-}

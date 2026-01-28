@@ -1,0 +1,27 @@
+system "defaults write -g ApplePressAndHoldEnabled -bool false"
+system "defaults write -g InitialKeyRepeat -int 10"
+system "defaults write -g KeyRepeat -int 1"
+system "defaults write com.apple.dock persistent-apps -array"
+
+cask "brave-browser", greedy: true
+cask "font-iosevka-nerd-font", greedy: true
+cask "ghostty", greedy: true
+cask "iina", greedy: true
+cask "orbstack", greedy: true
+cask "raycast", greedy: true
+cask "syncthing-app", greedy: true
+
+brew "ffmpeg-full", link: true
+
+brew "alejandra"
+brew "aria2"
+brew "fd"
+brew "fzf"
+brew "gh"
+brew "imagemagick"
+brew "lazydocker"
+brew "lazygit"
+brew "ripgrep"
+brew "stow"
+brew "tree"
+brew "zoxide"
